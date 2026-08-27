@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Humanize · AI Text Rewriter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#06060b;
+    --txt:#f1f0f7; --muted:#a3a2b8; --faint:#6d6c82;
+    --accent:#8b6cff; --accent2:#e05bff; --accent3:#39d3ff;
+    --ok:#37e39b; --err:#ff7a7a;
+    --glass:rgba(255,255,255,.05); --glass-brd:rgba(255,255,255,.10);
+    --radius:24px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:'Inter',system-ui,sans-serif; color:var(--txt); background:var(--bg);
+    min-height:100vh; overflow-x:hidden; -webkit-font-smoothing:antialiased;
+    display:flex; flex-direction:column; align-items:center; padding:34px 20px 70px;
+    letter-spacing:-.012em; position:relative;
+  }
+  /* fine grid + grain texture */
+  body::before{content:""; position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.5;
+    background-image:linear-gradient(rgba(255,255,255,.028) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(255,255,255,.028) 1px,transparent 1px);
+    background-size:44px 44px; mask-image:radial-gradient(circle at 50% 22%,#000 0%,transparent 72%)}
+  /* animated aurora */
+  .aurora{position:fixed; inset:0; z-index:0; overflow:hidden; pointer-events:none}
+  .aurora span{position:absolute; border-radius:50%; filter:blur(100px); opacity:.5; animation:drift 24s ease-in-out infinite}
+  .aurora span:nth-child(1){width:560px;height:560px;background:var(--accent); top:-160px; left:-120px}
+  .aurora span:nth-child(2){width:480px;height:480px;background:var(--accent2); top:12%; right:-180px; animation-delay:-8s}
+  .aurora span:nth-child(3){width:420px;height:420px;background:var(--accent3); bottom:-180px; left:26%; animation-delay:-16s}
+  @keyframes drift{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(70px,-46px) scale(1.14)}66%{transform:translate(-46px,56px) scale(.9)}}
+
+  .wrap{position:relative; z-index:1; width:100%; max-width:900px}
+
+  /* top status bar */
+  .bar{display:flex; align-items:center; justify-content:space-between; margin-bottom:44px}
+  .logo{display:flex; align-items:center; gap:11px; font-weight:700; font-size:1.02rem}
+  .logo .mark{width:32px; height:32px; border-radius:10px; display:grid; place-items:center; font-size:16px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2)); box-shadow:0 6px 20px -6px var(--accent)}
+  .pillstat{display:inline-flex; align-items:center; gap:8px; font-size:.74rem; font-weight:600; color:var(--muted);
+    border:1px solid var(--glass-brd); background:var(--glass); padding:8px 14px; border-radius:100px;
+    backdrop-filter:blur(12px)}
+  .pillstat .dot{width:7px;height:7px;border-radius:50%;background:var(--ok); box-shadow:0 0 10px var(--ok);
+    animation:blink 2.4s ease-in-out infinite}
+  @keyframes blink{50%{opacity:.4}}
+
+  header{text-align:center; margin-bottom:38px}
+  .kicker{display:inline-block; font-size:.72rem; font-weight:700; letter-spacing:.16em; text-transform:uppercase;
+    color:transparent; background:linear-gradient(90deg,var(--accent3),var(--accent2));
+    -webkit-background-clip:text; background-clip:text; margin-bottom:20px}
+  h1{font-size:clamp(2.7rem,7vw,4.4rem); font-weight:800; letter-spacing:-.035em; line-height:.98}
+  h1 em{font-family:'Instrument Serif',serif; font-style:italic; font-weight:400; letter-spacing:0;
+    background:linear-gradient(110deg,var(--accent3),var(--accent) 45%,var(--accent2));
+    background-size:220% auto; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+    animation:hue 7s linear infinite}
+  @keyframes hue{to{background-position:220% center}}
+  .tag{color:var(--muted); margin-top:18px; font-size:1.08rem; max-width:500px; margin-inline:auto; line-height:1.5}
+
+  /* gradient-bordered glass card */
+  .card{position:relative; border-radius:var(--radius); padding:1px;
+    background:linear-gradient(150deg,rgba(255,255,255,.18),rgba(255,255,255,.02) 40%,rgba(255,255,255,.14));
+    box-shadow:0 40px 100px -40px rgba(0,0,0,.85)}
+  .card-inner{background:linear-gradient(180deg,rgba(20,18,34,.72),rgba(12,11,20,.82));
+    backdrop-filter:blur(26px); -webkit-backdrop-filter:blur(26px); border-radius:calc(var(--radius) - 1px); padding:28px}
+
+  /* mode tabs */
+  .tabs{display:flex; gap:6px; background:rgba(0,0,0,.3); border:1px solid var(--glass-brd);
+    border-radius:100px; padding:5px; margin-bottom:22px; width:fit-content}
+  .tabs button{cursor:pointer; border:none; background:none; font:inherit; font-weight:600; font-size:.88rem;
+    color:var(--muted); padding:9px 22px; border-radius:100px; display:inline-flex; align-items:center; gap:8px; transition:.2s}
+  .tabs button svg{width:15px; height:15px}
+  .tabs button:hover{color:var(--txt)}
+  .tabs button.on{color:#fff; background:linear-gradient(120deg,var(--accent),var(--accent2));
+    box-shadow:0 8px 22px -8px rgba(139,108,255,.7)}
+
+  /* method pills */
+  .methods{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:22px}
+  .methods[hidden]{display:none}
+
+  /* detector result */
+  .detect{margin-top:2px}
+  .gauge{display:flex; align-items:center; gap:22px; flex-wrap:wrap;
+    background:rgba(255,255,255,.03); border:1px solid var(--glass-brd); border-radius:18px; padding:22px 24px}
+  .dial{--p:0; --c:var(--accent); position:relative; width:118px; height:118px; border-radius:50%; flex:none;
+    background:conic-gradient(var(--c) calc(var(--p)*1%),rgba(255,255,255,.08) 0)}
+  .dial::before{content:""; position:absolute; inset:9px; border-radius:50%; background:#0c0b14}
+  .dial .val{position:absolute; inset:0; display:grid; place-items:center; font-size:1.85rem; font-weight:800}
+  .dial .val small{font-size:.9rem; font-weight:600; color:var(--muted)}
+  .verdict-wrap{flex:1; min-width:200px}
+  .verdict{font-size:1.4rem; font-weight:800; letter-spacing:-.02em}
+  .verdict.ai{color:#ff8f8f} .verdict.human{color:var(--ok)} .verdict.mixed{color:#ffd166}
+  .verdict-sub{color:var(--muted); font-size:.88rem; margin-top:6px; line-height:1.5}
+  .signals{display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin-top:18px}
+  .sig{background:rgba(255,255,255,.03); border:1px solid var(--glass-brd); border-radius:12px; padding:12px 14px}
+  .sig .k{font-size:.68rem; color:var(--faint); text-transform:uppercase; letter-spacing:.06em}
+  .sig .v{font-size:1.15rem; font-weight:700; margin-top:3px; font-variant-numeric:tabular-nums}
+  .pill{cursor:pointer; position:relative; border:1px solid var(--glass-brd); background:rgba(255,255,255,.025);
+    border-radius:16px; padding:15px 16px; transition:.25s; overflow:hidden}
+  .pill::after{content:""; position:absolute; inset:0; border-radius:16px; padding:1px; opacity:0; transition:.25s;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor; mask-composite:exclude}
+  .pill:hover{transform:translateY(-3px); background:rgba(255,255,255,.05)}
+  .pill.active{background:linear-gradient(135deg,rgba(139,108,255,.20),rgba(224,91,255,.12))}
+  .pill.active::after{opacity:1}
+  .pill .ic{font-size:1.15rem}
+  .pill .name{font-weight:700; font-size:.94rem; margin-top:8px}
+  .pill .desc{color:var(--muted); font-size:.75rem; margin-top:3px; line-height:1.35}
+  .pill input{position:absolute; opacity:0; pointer-events:none}
+
+  .field{position:relative}
+  textarea{width:100%; min-height:200px; padding:18px 20px 42px; font:inherit; font-size:1.05rem; line-height:1.65;
+    color:var(--txt); background:rgba(0,0,0,.3); border:1px solid var(--glass-brd);
+    border-radius:16px; resize:vertical; transition:.2s}
+  textarea:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 4px rgba(139,108,255,.16)}
+  textarea::placeholder{color:var(--faint)}
+  .count{position:absolute; bottom:14px; right:18px; font-size:.72rem; color:var(--faint);
+    background:rgba(0,0,0,.5); padding:4px 11px; border-radius:100px; pointer-events:none; font-variant-numeric:tabular-nums}
+
+  .actions{display:flex; justify-content:space-between; align-items:center; gap:14px; margin-top:20px; flex-wrap:wrap}
+  .hint{font-size:.8rem; color:var(--faint)}
+  .btn{cursor:pointer; border:none; font:inherit; font-weight:700; font-size:1.02rem; color:#fff;
+    padding:15px 34px; border-radius:100px; display:inline-flex; align-items:center; gap:10px; position:relative;
+    background:linear-gradient(120deg,var(--accent),var(--accent2),var(--accent)); background-size:220% 220%;
+    box-shadow:0 14px 40px -12px rgba(139,108,255,.7); transition:transform .2s,box-shadow .2s; animation:sheen 6s linear infinite}
+  @keyframes sheen{to{background-position:220% 50%}}
+  .btn:hover:not(:disabled){transform:translateY(-2px); box-shadow:0 20px 50px -12px rgba(139,108,255,.85)}
+  .btn:active{transform:translateY(0)}
+  .btn:disabled{opacity:.65; cursor:progress}
+  .spinner{width:17px;height:17px;border:2.5px solid rgba(255,255,255,.35); border-top-color:#fff;
+    border-radius:50%; animation:spin .7s linear infinite; display:none}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .btn.loading .spinner{display:inline-block}
+
+  .result{margin-top:24px; border-top:1px solid var(--glass-brd); padding-top:24px; display:none}
+  .result.show{display:block; animation:rise .5s cubic-bezier(.2,.7,.3,1)}
+  @keyframes rise{from{opacity:0; transform:translateY(16px)}to{opacity:1; transform:translateY(0)}}
+  .result-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px}
+  .chips{display:flex; gap:8px; flex-wrap:wrap}
+  .chip{font-size:.72rem; font-weight:600; color:var(--muted); border:1px solid var(--glass-brd);
+    background:rgba(255,255,255,.03); padding:6px 12px; border-radius:100px}
+  .chip b{color:var(--txt); font-weight:700}
+  .copy{cursor:pointer; font:inherit; font-size:.8rem; font-weight:600; color:var(--txt);
+    background:rgba(255,255,255,.07); border:1px solid var(--glass-brd); padding:9px 15px;
+    border-radius:100px; transition:.2s; display:inline-flex; align-items:center; gap:6px}
+  .copy:hover{background:rgba(255,255,255,.13)}
+  .copy.done{color:var(--ok); border-color:var(--ok)}
+  .copy[hidden]{display:none}
+  .out{white-space:pre-wrap; line-height:1.78; font-size:1.06rem;
+    background:rgba(255,255,255,.03); border:1px solid var(--glass-brd); border-radius:16px; padding:20px 22px}
+  .out.err{color:var(--err); border-color:rgba(255,122,122,.4)}
+
+  footer{margin-top:34px; text-align:center; color:var(--faint); font-size:.8rem}
+  footer a{color:var(--accent3); text-decoration:none}
+  footer a:hover{text-decoration:underline}
+
+  @media (max-width:620px){ .card-inner{padding:18px} .methods{grid-template-columns:1fr} .bar{margin-bottom:30px} }
+
+  /* lucide icon sizing */
+  svg[stroke]{stroke-width:1.75}
+  .logo .mark svg{width:17px; height:17px; color:#fff}
+  .pill .ic{display:flex}
+  .pill .ic svg{width:22px; height:22px; color:var(--accent3)}
+  .pill.active .ic svg{color:var(--txt)}
+  .btn svg{width:17px; height:17px}
+  .copy svg{width:14px; height:14px}
+  .pillstat .dot svg{display:none}
+</style>
+</head>
+<body>
+  <div class="aurora"><span></span><span></span><span></span></div>
+
+  <div class="wrap">
+    <div class="bar">
+      <div class="logo"><span class="mark"><i data-lucide="sparkles"></i></span> Humanizer</div>
+      <span class="pillstat"><span class="dot"></span> DeepSeek connected</span>
+    </div>
+
+    <header>
+      <span class="kicker">AI Text Rewriter</span>
+      <h1>Make it sound<br><em>genuinely human</em></h1>
+      <p class="tag">Paste AI-generated text and rewrite it into natural, human cadence — instantly.</p>
+    </header>
+
+    <div class="card">
+      <div class="card-inner">
+        <div class="tabs" id="tabs">
+          <button class="on" data-mode="humanize"><i data-lucide="wand-sparkles"></i> Humanize</button>
+          <button data-mode="detect"><i data-lucide="scan-search"></i> Detect AI</button>
+        </div>
+
+        <div class="methods" id="methods">
+          <label class="pill active">
+            <input type="radio" name="method" value="llm_rewrite" checked>
+            <div class="ic"><i data-lucide="wand-sparkles"></i></div><div class="name">LLM Rewrite</div>
+            <div class="desc">DeepSeek · best quality</div>
+          </label>
+          <label class="pill">
+            <input type="radio" name="method" value="translation_chain">
+            <div class="ic"><i data-lucide="languages"></i></div><div class="name">Translation</div>
+            <div class="desc">EN→ZH→JA→EN · free</div>
+          </label>
+          <label class="pill">
+            <input type="radio" name="method" value="mixed_engine">
+            <div class="ic"><i data-lucide="blend"></i></div><div class="name">Mixed Engine</div>
+            <div class="desc">Multi-engine blend</div>
+          </label>
+        </div>
+
+        <div class="field">
+          <textarea id="text" placeholder="Paste your AI-generated draft here…"></textarea>
+          <span class="count" id="count">0 words</span>
+        </div>
+
+        <div class="actions">
+          <span class="hint" id="hint">Tip — longer passages humanize better than single sentences.</span>
+          <button class="btn" id="go"><span class="spinner"></span><span class="label">Humanize</span><i data-lucide="sparkles" class="btn-ic"></i></button>
+        </div>
+
+        <div class="result" id="result">
+          <div class="result-head">
+            <div class="chips" id="chips"></div>
+            <button class="copy" id="copy" hidden><i data-lucide="copy"></i> Copy</button>
+          </div>
+          <div class="out" id="out"></div>
+          <div class="detect" id="detect" hidden></div>
+        </div>
+      </div>
+    </div>
+
+    <footer>humanize-text · self-hosted · <a href="/docs">API docs</a> · ⌘/Ctrl + Enter to run</footer>
+  </div>
+
+<script>
+const $=id=>document.getElementById(id);
+const ta=$('text'), out=$('out'), result=$('result'), btn=$('go'), chips=$('chips'), copyBtn=$('copy');
+const detectBox=$('detect'), methodsBox=$('methods'), hint=$('hint');
+const MAX_CHARS=20000, CLIENT_TIMEOUT_MS=190000;
+let mode='humanize';
+
+document.querySelectorAll('.pill').forEach(p=>p.addEventListener('click',()=>{
+  document.querySelectorAll('.pill').forEach(x=>x.classList.remove('active'));
+  p.classList.add('active'); p.querySelector('input').checked=true;
+}));
+
+// mode tabs
+document.querySelectorAll('#tabs button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#tabs button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); mode=b.dataset.mode;
+  const detectMode = mode==='detect';
+  methodsBox.hidden=detectMode;
+  ta.placeholder = detectMode ? 'Paste text to check for AI generation…' : 'Paste your AI-generated draft here…';
+  hint.textContent = detectMode ? 'Heuristic detector — longer text gives a more reliable score.' : 'Tip — longer passages humanize better than single sentences.';
+  btn.querySelector('.label').textContent = detectMode ? 'Analyze' : 'Humanize';
+  btn.querySelector('.btn-ic').setAttribute('data-lucide', detectMode ? 'scan-search' : 'sparkles');
+  result.classList.remove('show');
+  if(window.lucide) lucide.createIcons();
+}));
+
+function countWords(){
+  const raw=ta.value, w=raw.trim(), n=w?w.split(/\s+/).length:0, el=$('count');
+  el.textContent=n+' words · '+raw.length+'/'+MAX_CHARS;
+  el.style.color = raw.length>MAX_CHARS ? 'var(--err)' : 'var(--faint)';
+}
+ta.addEventListener('input',countWords); countWords();
+
+const icons=()=>window.lucide&&window.lucide.createIcons();
+copyBtn.addEventListener('click',async()=>{
+  try{ await navigator.clipboard.writeText(out.textContent);
+    copyBtn.classList.add('done'); copyBtn.innerHTML='<i data-lucide="check"></i> Copied'; icons();
+    setTimeout(()=>{copyBtn.classList.remove('done'); copyBtn.innerHTML='<i data-lucide="copy"></i> Copy'; icons();},1600);
+  }catch(_){}
+});
+
+function fmtDetail(d){
+  if(Array.isArray(d)) return d.map(x=>x.msg||JSON.stringify(x)).join('; ');
+  if(d&&typeof d==='object') return d.msg||JSON.stringify(d);
+  return d;
+}
+function showText(t){ detectBox.hidden=true; out.hidden=false; out.classList.remove('err'); out.textContent=t; copyBtn.hidden=false; result.classList.add('show'); }
+function showErr(t){ detectBox.hidden=true; out.hidden=false; out.classList.add('err'); out.textContent=t; copyBtn.hidden=true; chips.innerHTML=''; result.classList.add('show'); }
+
+function showDetect(d){
+  out.hidden=true; copyBtn.hidden=true; chips.innerHTML=''; detectBox.hidden=false;
+  const cls=d.label; const color=cls==='ai'?'#ff8f8f':cls==='human'?'var(--ok)':'#ffd166';
+  const s=d.signals;
+  const conf=Math.round((d.confidence!=null?d.confidence:1)*100);
+  const tops=(d.top_signals||[]).map(t=>`<span class="chip">${t.signal} · <b>${Math.round(t.ai_score*100)}%</b></span>`).join('');
+  detectBox.innerHTML=
+    `<div class="gauge">
+       <div class="dial" style="--p:${d.percent};--c:${color}"><div class="val">${d.percent}<small>%</small></div></div>
+       <div class="verdict-wrap">
+         <div class="verdict ${cls}">${d.verdict}</div>
+         <div class="verdict-sub">${d.percent}% estimated AI likelihood · confidence ${conf}%. Ensemble stylometric heuristic — treat as a signal, not proof.</div>
+         ${tops?`<div class="signals" style="grid-template-columns:none;display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">${tops}</div>`:''}
+       </div>
+     </div>
+     <div class="signals">
+       <div class="sig"><div class="k">Words</div><div class="v">${s.words}</div></div>
+       <div class="sig"><div class="k">Sentences</div><div class="v">${s.sentences}</div></div>
+       <div class="sig"><div class="k">Vocab richness</div><div class="v">${s.vocabulary_richness}</div></div>
+       <div class="sig"><div class="k">Avg sent. len</div><div class="v">${s.avg_sentence_len}</div></div>
+       <div class="sig"><div class="k">Len variation</div><div class="v">${s.sentence_len_variation}</div></div>
+       <div class="sig"><div class="k">Contractions/100w</div><div class="v">${s.contraction_rate}</div></div>
+       <div class="sig"><div class="k">Connector density</div><div class="v">${s.connector_density}</div></div>
+       <div class="sig"><div class="k">Cliché hits</div><div class="v">${s.cliche_hits}</div></div>
+     </div>`;
+  result.classList.add('show');
+}
+
+async function run(){
+  const text=ta.value.trim();
+  if(!text){ ta.focus(); showErr('Enter some text first.'); return; }
+  if(text.length>MAX_CHARS){ showErr('Text is too long — trim it to '+MAX_CHARS+' characters.'); return; }
+  const detect = mode==='detect';
+  const endpoint = detect ? '/detect' : '/humanize';
+  const body = detect ? {text} : {text, method:document.querySelector('input[name=method]:checked').value};
+  btn.disabled=true; btn.classList.add('loading'); btn.querySelector('.label').textContent=detect?'Analyzing…':'Humanizing…';
+  chips.innerHTML='';
+  const ctrl=new AbortController(); const timer=setTimeout(()=>ctrl.abort(),CLIENT_TIMEOUT_MS);
+  try{
+    const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body),signal:ctrl.signal});
+    let data={}; try{ data=await r.json(); }catch(_){ throw new Error('Unexpected server response ('+r.status+').'); }
+    if(!r.ok) throw new Error(fmtDetail(data.detail)||('Request failed (HTTP '+r.status+')'));
+    if(detect){ showDetect(data); }
+    else{
+      showText(data.result);
+      const inW=text.split(/\s+/).length, outW=data.result.trim().split(/\s+/).length;
+      chips.innerHTML=
+        `<span class="chip">method · <b>${data.method}</b></span>`+
+        (data.processing_time_ms!=null?`<span class="chip"><b>${data.processing_time_ms} ms</b></span>`:'')+
+        `<span class="chip">${inW} → <b>${outW}</b> words</span>`;
+    }
+  }catch(e){
+    let msg=e.message;
+    if(e.name==='AbortError') msg='Timed out — the server took too long. Try shorter text or retry.';
+    else if(e instanceof TypeError) msg='Network error — could not reach the server. Retry shortly.';
+    showErr('⚠ '+msg);
+  }finally{
+    clearTimeout(timer); btn.disabled=false; btn.classList.remove('loading');
+    btn.querySelector('.label').textContent = mode==='detect' ? 'Analyze' : 'Humanize';
+  }
+}
+btn.addEventListener('click',run);
+ta.addEventListener('keydown',e=>{ if((e.metaKey||e.ctrlKey)&&e.key==='Enter') run(); });
+</script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>lucide.createIcons();</script>
+</body>
+</html>
